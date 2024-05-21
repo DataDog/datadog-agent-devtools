@@ -116,9 +116,11 @@ jobs:
           suffix="${{ env.VERSION_SUFFIX || '' }}"
           
           if [[ "${{ matrix.job.target }}" =~ -pc-windows- ]]; then
-            mv ${PYAPP_REPO}/target/${{ matrix.job.target }}/release/pyapp binaries/${{ env.PROJECT_NAME }}-${{ matrix.job.target }}-${{ env.PROJECT_VERSION }}${suffix}.exe  
+            mv ${PYAPP_REPO}/target/${{ matrix.job.target }}/release/pyapp binaries/${{ env.PROJECT_NAME }}-${{ matrix.job.target }}-${{ env.PROJECT_VERSION }}${suffix}.exe
+            chmod +x binaries/${{ env.PROJECT_NAME }}-${{ matrix.job.target }}-${{ env.PROJECT_VERSION }}${suffix}.exe
           else
             mv ${PYAPP_REPO}/target/${{ matrix.job.target }}/release/pyapp binaries/${{ env.PROJECT_NAME }}-${{ matrix.job.target }}-${{ env.PROJECT_VERSION }}${suffix}
+            chmod +x binaries/${{ env.PROJECT_NAME }}-${{ matrix.job.target }}-${{ env.PROJECT_VERSION }}${suffix}
           fi
 
       - name: Upload staged archive
