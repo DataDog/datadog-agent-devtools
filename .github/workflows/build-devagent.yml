@@ -5,7 +5,7 @@ on:
     tags:
       - devagent-v*
     branches:
-      - master
+      - main
   pull_request:
 
 concurrency:
