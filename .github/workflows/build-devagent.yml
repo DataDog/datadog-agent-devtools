@@ -22,6 +22,11 @@ env:
   PYAPP_PROJECT_VERSION: "2.2.0"  # underlying invoke version
   PYAPP_PYTHON_VERSION: "3.11"  # underlying Python version
   PYAPP_PROJECT_NAME: "invoke"
+  PYAPP_EXPOSE_PIP: 1
+  PYAPP_EXPOSE_PYTHON: 1
+  PYAPP_EXPOSE_CACHE: 1
+  PYAPP_EXPOSE_METADATA: 1
+  PYAPP_EXPOSE_PYTHON_PATH: 1
   PYTHON_VERSION: "3.11"  # Used in the pipeline itself
   PYAPP_REPO: pyapp  # Path to the PyApp repository
   PYAPP_VERSION: "0.21.1"
