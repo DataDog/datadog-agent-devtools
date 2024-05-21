@@ -22,6 +22,7 @@ env:
   PYAPP_PROJECT_VERSION: "2.2.0"  # underlying invoke version
   PYAPP_PYTHON_VERSION: "3.11"  # underlying Python version
   PYAPP_PROJECT_NAME: "invoke"
+  PYAPP_PROJECT_DEPENDENCY_FILE: "/tmp/requirements.txt"
   PYAPP_EXPOSE_PIP: 1
   PYAPP_EXPOSE_PYTHON: 1
   PYAPP_EXPOSE_CACHE: 1
@@ -87,6 +88,10 @@ jobs:
         with:
           tool: cross
 
+      - name: Download the requirements file
+        run: |
+          curl -L -o /tmp/requirements.txt https://raw.githubusercontent.com/DataDog/datadog-agent/main/requirements.txt
+
       - name: Configure cross compiling
         if: matrix.job.cross
         run: echo "CARGO_COMMAND=cross" >> $GITHUB_ENV
@@ -99,7 +104,7 @@ jobs:
           fi
 
       - name: Build binary
-        run: $CARGO_COMMAND build --manifest-path ${PYAPP_REPO}/Cargo.toml --release
+        run: DOCKER_OPTS="-v /tmp/requirements.txt:/tmp/requirements.txt" $CARGO_COMMAND build --manifest-path ${PYAPP_REPO}/Cargo.toml --release
 
       - name: Set version suffix
         if: github.event_name == 'push' && startsWith(github.event.ref, 'refs/tags')
