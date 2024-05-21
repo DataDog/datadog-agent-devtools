@@ -1,4 +1,4 @@
-name: build
+name: Build devagent
 
 on:
   push:
@@ -19,14 +19,13 @@ defaults:
 env:
   PROJECT_NAME: "devagent"
   PROJECT_VERSION: "0.0.1"
-  PYAPP_PROJECT_VERSION: "2.2.0"
-  PYAPP_PYTHON_VERSION: "3.11"
-  PYOXIDIZER_VERSION: "0.24.0"
+  PYAPP_PROJECT_VERSION: "2.2.0"  # underlying invoke version
+  PYAPP_PYTHON_VERSION: "3.11"  # underlying Python version
   PYAPP_PROJECT_NAME: "invoke"
-  PYTHON_VERSION: "3.11"
-  PYAPP_REPO: pyapp
+  PYTHON_VERSION: "3.11"  # Used in the pipeline itself
+  PYAPP_REPO: pyapp  # Path to the PyApp repository
   PYAPP_VERSION: "0.21.1"
-  CARGO_COMMAND: cargo
+  CARGO_COMMAND: cargo  # Cargo command to run
   VERSION_SUFFIX: "-dev"
 
 jobs:
@@ -103,13 +102,13 @@ jobs:
 
       - name: Name binary
         run: |-
-          mkdir packaging
+          mkdir binaries
           suffix="${{ env.VERSION_SUFFIX || '' }}"
           
           if [[ "${{ matrix.job.target }}" =~ -pc-windows- ]]; then
-            mv ${PYAPP_REPO}/target/${{ matrix.job.target }}/release/pyapp packaging/${{ env.PROJECT_NAME }}-${{ matrix.job.target }}-${{ env.PROJECT_VERSION }}${suffix}.exe  
+            mv ${PYAPP_REPO}/target/${{ matrix.job.target }}/release/pyapp binaries/${{ env.PROJECT_NAME }}-${{ matrix.job.target }}-${{ env.PROJECT_VERSION }}${suffix}.exe  
           else
-            mv ${PYAPP_REPO}/target/${{ matrix.job.target }}/release/pyapp packaging/${{ env.PROJECT_NAME }}-${{ matrix.job.target }}-${{ env.PROJECT_VERSION }}${suffix}
+            mv ${PYAPP_REPO}/target/${{ matrix.job.target }}/release/pyapp binaries/${{ env.PROJECT_NAME }}-${{ matrix.job.target }}-${{ env.PROJECT_VERSION }}${suffix}
           fi
 
       - name: Upload staged archive
@@ -117,7 +116,7 @@ jobs:
         uses: actions/upload-artifact@v3
         with:
           name: staged-${{ runner.os }}
-          path: packaging/*
+          path: binaries/*
           if-no-files-found: error
 
       - name: Upload archive
@@ -125,7 +124,7 @@ jobs:
         uses: actions/upload-artifact@v3
         with:
           name: standalone
-          path: packaging/*
+          path: binaries/*
           if-no-files-found: error
 
   macos-signing:
