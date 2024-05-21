@@ -1,0 +1,210 @@
+name: build
+
+on:
+  push:
+    tags:
+      - devagent-v*
+    branches:
+      - master
+  pull_request:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.sha }}
+  cancel-in-progress: true
+
+defaults:
+  run:
+    shell: bash
+
+env:
+  PROJECT_NAME: "devagent"
+  PROJECT_VERSION: "0.0.1"
+  PYAPP_PROJECT_VERSION: "2.2.0"
+  PYAPP_PYTHON_VERSION: "3.11"
+  PYOXIDIZER_VERSION: "0.24.0"
+  PYAPP_PROJECT_NAME: "invoke"
+  PYTHON_VERSION: "3.11"
+  PYAPP_REPO: pyapp
+  PYAPP_VERSION: "0.21.1"
+  CARGO_COMMAND: cargo
+  VERSION_SUFFIX: "-dev"
+
+jobs:
+  binaries:
+    name: ${{ matrix.job.target }} (${{ matrix.job.os }})
+    runs-on: ${{ matrix.job.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        job:
+          # Linux
+          - target: aarch64-unknown-linux-gnu
+            os: ubuntu-22.04
+            cross: true
+          - target: x86_64-unknown-linux-gnu
+            os: ubuntu-22.04
+            cross: true
+          - target: x86_64-unknown-linux-musl
+            os: ubuntu-22.04
+            cross: true
+          - target: powerpc64le-unknown-linux-gnu
+            os: ubuntu-22.04
+            cross: true
+          # Windows
+          - target: x86_64-pc-windows-msvc
+            os: windows-2022
+          - target: i686-pc-windows-msvc
+            os: windows-2022
+          # macOS
+          - target: aarch64-apple-darwin
+            os: macos-12
+          - target: x86_64-apple-darwin
+            os: macos-12
+
+    env:
+      CARGO_BUILD_TARGET: ${{ matrix.job.target }}
+
+    steps:
+      - name: Fetch PyApp
+        run: >-
+          mkdir $PYAPP_REPO && curl -L
+          https://github.com/ofek/pyapp/releases/download/v$PYAPP_VERSION/source.tar.gz
+          |
+          tar --strip-components=1 -xzf - -C $PYAPP_REPO
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: ${{ matrix.job.target }}
+
+      - name: Set up cross compiling
+        if: matrix.job.cross
+        uses: taiki-e/install-action@v2
+        with:
+          tool: cross
+
+      - name: Configure cross compiling
+        if: matrix.job.cross
+        run: echo "CARGO_COMMAND=cross" >> $GITHUB_ENV
+
+      - name: Configure target
+        run: |-
+          config_file="$PYAPP_REPO/.cargo/config_${{ matrix.job.target }}.toml"
+          if [[ -f "$config_file" ]]; then
+            mv "$config_file" "$PYAPP_REPO/.cargo/config.toml"
+          fi
+
+      - name: Build binary
+        run: $CARGO_COMMAND build --manifest-path ${PYAPP_REPO}/Cargo.toml --release
+
+      - name: Set version suffix
+        if: github.event_name == 'push' && startsWith(github.event.ref, 'refs/tags')
+        run: echo "VERSION_SUFFIX=''" >> $GITHUB_ENV
+
+      - name: Name binary
+        run: |-
+          mkdir packaging
+          suffix="${{ env.VERSION_SUFFIX || '' }}"
+          
+          if [[ "${{ matrix.job.target }}" =~ -pc-windows- ]]; then
+            mv ${PYAPP_REPO}/target/${{ matrix.job.target }}/release/pyapp packaging/${{ env.PROJECT_NAME }}-${{ matrix.job.target }}-${{ env.PROJECT_VERSION }}${suffix}.exe  
+          else
+            mv ${PYAPP_REPO}/target/${{ matrix.job.target }}/release/pyapp packaging/${{ env.PROJECT_NAME }}-${{ matrix.job.target }}-${{ env.PROJECT_VERSION }}${suffix}
+          fi
+
+      - name: Upload staged archive
+        if: runner.os == 'macOS'
+        uses: actions/upload-artifact@v3
+        with:
+          name: staged-${{ runner.os }}
+          path: packaging/*
+          if-no-files-found: error
+
+      - name: Upload archive
+        if: runner.os != 'macOS'
+        uses: actions/upload-artifact@v3
+        with:
+          name: standalone
+          path: packaging/*
+          if-no-files-found: error
+
+  macos-signing:
+    name: Build macOS installer and sign/notarize artifacts
+    if: github.event_name == 'push' || github.event.pull_request.head.repo.full_name == github.repository
+    needs: binaries
+    runs-on: macos-12
+
+    steps:
+      - name: Install rcodesign
+        run: cargo install apple-codesign
+
+      - name: Download staged binaries
+        uses: actions/download-artifact@v3
+        with:
+          name: staged-${{ runner.os }}
+          path: binaries
+
+      - name: Write credentials
+        env:
+          APPLE_DEVELOPER_ID_APPLICATION_CERTIFICATE: "${{ secrets.APPLE_DEVELOPER_ID_APPLICATION_CERTIFICATE }}"
+          APPLE_DEVELOPER_ID_APPLICATION_PRIVATE_KEY: "${{ secrets.APPLE_DEVELOPER_ID_APPLICATION_PRIVATE_KEY }}"
+          APPLE_APP_STORE_CONNECT_API_DATA: "${{ secrets.APPLE_APP_STORE_CONNECT_API_DATA }}"
+        run: |-
+          echo "$APPLE_DEVELOPER_ID_APPLICATION_CERTIFICATE" > /tmp/certificate.pem
+          echo "$APPLE_DEVELOPER_ID_APPLICATION_PRIVATE_KEY" > /tmp/private-key.pem
+          echo "$APPLE_APP_STORE_CONNECT_API_DATA" > /tmp/app-store-connect.json
+
+      # https://developer.apple.com/documentation/security/hardened_runtime
+      - name: Sign binaries
+        run: |-
+          for f in binaries/*; do
+            rcodesign sign -vv \
+            --pem-source /tmp/certificate.pem \
+            --pem-source /tmp/private-key.pem \
+            --code-signature-flags runtime \
+            "$f"
+          done
+
+      # https://developer.apple.com/documentation/security/notarizing_macos_software_before_distribution
+      - name: Notarize binaries
+        run: |-
+          mkdir notarize-binaries
+          
+          cd binaries
+          for f in *; do
+            zip "../notarize-binaries/$f.zip" "$f"
+          done
+          
+          cd ../notarize-binaries
+          for f in *; do
+            rcodesign notary-submit -vv \
+            --api-key-path /tmp/app-store-connect.json \
+            "$f"
+          done
+
+      - name: Upload binaries
+        uses: actions/upload-artifact@v3
+        with:
+          name: standalone
+          path: binaries/*
+
+  publish:
+    name: Publish release
+    if: github.event_name == 'push' && startsWith(github.event.ref, 'refs/tags')
+    needs:
+      - binaries
+      - macos-signing
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Download binaries
+        uses: actions/download-artifact@v3
+        with:
+          name: standalone
+          path: binaries
+
+      - name: Add assets to current release
+        uses: softprops/action-gh-release@v1
+        with:
+          files: |-
+            binaries/*
