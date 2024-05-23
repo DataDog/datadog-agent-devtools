@@ -215,6 +215,9 @@ jobs:
           merge-multiple: true
           path: binaries
 
+      - name: Make the binaries executable
+        run: chmod +x binaries/*
+
       - name: Add assets to current release
         uses: softprops/action-gh-release@v1
         with:
