@@ -35,6 +35,7 @@ env:
   PYAPP_VERSION: "0.21.1"
   CARGO_COMMAND: cargo  # Cargo command to run
   VERSION_SUFFIX: "-dev"
+  AGENT_REQUIREMENTS: "https://raw.githubusercontent.com/DataDog/datadog-agent/main/requirements.txt"
 
 jobs:
   binaries:
@@ -90,7 +91,7 @@ jobs:
 
       - name: Download the requirements file
         run: |
-          curl -L -o /tmp/requirements.txt https://raw.githubusercontent.com/DataDog/datadog-agent/main/requirements.txt
+          curl -L -o ${PYAPP_PROJECT_DEPENDENCY_FILE} ${AGENT_REQUIREMENTS}
 
       - name: Configure cross compiling
         if: matrix.job.cross
@@ -104,7 +105,7 @@ jobs:
           fi
 
       - name: Build binary
-        run: DOCKER_OPTS="-v /tmp/requirements.txt:/tmp/requirements.txt" $CARGO_COMMAND build --manifest-path ${PYAPP_REPO}/Cargo.toml --release
+        run: DOCKER_OPTS="-v ${PYAPP_PROJECT_DEPENDENCY_FILE}:${PYAPP_PROJECT_DEPENDENCY_FILE}" $CARGO_COMMAND build --manifest-path ${PYAPP_REPO}/Cargo.toml --release
 
       - name: Set version suffix
         if: github.event_name == 'push' && startsWith(github.event.ref, 'refs/tags')
