@@ -1,14 +1,14 @@
-name: Build devagent
+name: Build deva
 
 on:
   push:
     tags:
-      - devagent-v*
+      - deva-v*
     branches:
       - main
   pull_request:
     paths:
-      - .github/workflows/build-devagent.yml
+      - .github/workflows/build-deva.yml
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.sha }}
@@ -19,7 +19,7 @@ defaults:
     shell: bash
 
 env:
-  PROJECT_NAME: "devagent"
+  PROJECT_NAME: "deva"
   PROJECT_VERSION: "0.0.3"
   PYAPP_PROJECT_VERSION: "2.2.0"  # underlying invoke version
   PYAPP_PYTHON_VERSION: "3.11"  # underlying Python version
