@@ -60,9 +60,9 @@ jobs:
             os: windows-2022
           # macOS
           - target: aarch64-apple-darwin
-            os: macos-12
+            os: macos-15
           - target: x86_64-apple-darwin
-            os: macos-12
+            os: macos-15
 
     env:
       CARGO_BUILD_TARGET: ${{ matrix.job.target }}
@@ -139,7 +139,7 @@ jobs:
     name: Build macOS installer and sign/notarize artifacts
     if: github.event_name == 'push' || github.event.pull_request.head.repo.full_name == github.repository
     needs: binaries
-    runs-on: macos-12
+    runs-on: macos-15
 
     steps:
       - name: Download staged binaries
