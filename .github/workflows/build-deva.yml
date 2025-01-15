@@ -187,6 +187,8 @@ jobs:
           for f in *; do
             rcodesign notary-submit -vv \
             --api-key-path /tmp/app-store-connect.json \
+            --wait \
+            --timeout 40m \
             "$f"
           done
 
